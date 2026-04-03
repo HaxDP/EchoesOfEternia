@@ -38,3 +38,6 @@
 *.app
 
 /crashlytics-build.properties
+
+# Unity-generated project setting file; safe to ignore.
+/ProjectSettings/SceneTemplateSettings.json
