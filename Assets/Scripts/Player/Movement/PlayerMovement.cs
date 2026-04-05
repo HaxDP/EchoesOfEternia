@@ -9,7 +9,6 @@ public class PlayerMovement : MonoBehaviour
 	[SerializeField] private float jumpHeight = 1.5f;
 	[SerializeField] private float groundedSnapVelocity = -2f;
 	[SerializeField] private float maxFallSpeed = -30f;
-	[SerializeField] private bool allowUpArrowJump;
 
 	private CharacterController characterController;
 	private Vector3 velocity;
@@ -26,8 +25,17 @@ public class PlayerMovement : MonoBehaviour
 
 	private void HandleMovementAndJump()
 	{
-		var moveX = Input.GetAxis("Horizontal");
-		var moveZ = Input.GetAxis("Vertical");
+		var moveX = 0f;
+		if (Input.GetKey(KeyCode.A))
+		{
+			moveX -= 1f;
+		}
+		if (Input.GetKey(KeyCode.D))
+		{
+			moveX += 1f;
+		}
+
+		var moveZ = Input.GetKey(KeyCode.W) ? 1f : 0f;
 
 		var flatRight = transform.right;
 		flatRight.y = 0f;
@@ -67,11 +75,6 @@ public class PlayerMovement : MonoBehaviour
 
 	private bool IsJumpPressed()
 	{
-		if (Input.GetButtonDown("Jump"))
-		{
-			return true;
-		}
-
-		return allowUpArrowJump && Input.GetKeyDown(KeyCode.UpArrow);
+		return Input.GetKeyDown(KeyCode.Space) || Input.GetButtonDown("Jump");
 	}
 }

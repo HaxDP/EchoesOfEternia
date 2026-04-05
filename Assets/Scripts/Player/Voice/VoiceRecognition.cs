@@ -32,7 +32,18 @@ public class VoiceRecognition : MonoBehaviour
 	[Header("Events")]
 	[SerializeField] private VoiceCommandEvent onCommandRecognized;
 
+	public event Action<string> CommandRecognized;
+
 	private readonly Dictionary<string, Action> commands = new Dictionary<string, Action>(StringComparer.OrdinalIgnoreCase);
+	private static readonly string[] TiseAliases =
+	{
+		"tise", "tais", "tyce", "ties", "taise", "taiz", "taisz", "tease", "teez", "tays", "тайс", "тайз"
+	};
+
+	private static readonly string[] EchoAliases =
+	{
+		"echo", "akho", "aho", "eko", "ecco", "ekko", "eho", "ekho", "yeho", "yekho", "jeho", "ехо", "эхо"
+	};
 
 	private KeywordRecognizer keywordRecognizer;
 	private AudioClip microphoneClip;
@@ -169,8 +180,10 @@ public class VoiceRecognition : MonoBehaviour
 		}
 
 		action.Invoke();
-		onCommandRecognized?.Invoke(mappedKeyword);
-		Debug.Log($"Recognized command: {mappedKeyword} (raw: {args.text})");
+		var canonicalCommand = GetCanonicalCommand(mappedKeyword);
+		onCommandRecognized?.Invoke(canonicalCommand);
+		CommandRecognized?.Invoke(canonicalCommand);
+		Debug.Log($"Recognized command: {canonicalCommand} (raw: {args.text})");
 	}
 
 	private string NormalizeKeyword(string input)
@@ -180,7 +193,48 @@ public class VoiceRecognition : MonoBehaviour
 
 	private bool IsTiseAlias(string command)
 	{
-		return command == "tais" || command == "tyce" || command == "ties" || command == "tise";
+		for (var i = 0; i < TiseAliases.Length; i++)
+		{
+			if (string.Equals(command, TiseAliases[i], StringComparison.OrdinalIgnoreCase))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private bool IsEchoAlias(string command)
+	{
+		for (var i = 0; i < EchoAliases.Length; i++)
+		{
+			if (string.Equals(command, EchoAliases[i], StringComparison.OrdinalIgnoreCase))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private string GetCanonicalCommand(string command)
+	{
+		if (string.IsNullOrEmpty(command))
+		{
+			return string.Empty;
+		}
+
+		if (IsTiseAlias(command))
+		{
+			return "tise";
+		}
+
+		if (IsEchoAlias(command))
+		{
+			return "echo";
+		}
+
+		return command;
 	}
 
 	private bool TryFindClosestKeyword(string recognizedText, out string closestKeyword, out float similarity)
@@ -436,24 +490,26 @@ public class VoiceRecognition : MonoBehaviour
 	{
 		commands.Clear();
 
-		commands["start"] = () => HandleCommand("start");
-		commands["stop"] = () => HandleCommand("stop");
-		commands["ignis"] = () => HandleCommand("ignis");
-		commands["tais"] = () => HandleCommand("tise");
-		commands["tyce"] = () => HandleCommand("tise");
-		commands["ties"] = () => HandleCommand("tise");
-		commands["mentiri"] = () => HandleCommand("mentiri");
-		commands["echo"] = () => HandleCommand("echo");
-		commands["eko"] = () => HandleCommand("echo");
-		commands["ecco"] = () => HandleCommand("echo");
-		commands["ekko"] = () => HandleCommand("echo");
-		commands["eho"] = () => HandleCommand("echo");
-		commands["ekho"] = () => HandleCommand("echo");
-		commands["yeho"] = () => HandleCommand("echo");
-		commands["yekho"] = () => HandleCommand("echo");
-		commands["jeho"] = () => HandleCommand("echo");
-		commands["ехо"] = () => HandleCommand("echo");
-		commands["эхо"] = () => HandleCommand("echo");
+		AddCommand("start", "start");
+		AddCommand("stop", "stop");
+		AddCommand("default", "default");
+		AddCommand("ignis", "ignis");
+		AddCommand("mentiri", "mentiri");
+
+		for (var i = 0; i < TiseAliases.Length; i++)
+		{
+			AddCommand(TiseAliases[i], "tise");
+		}
+
+		for (var i = 0; i < EchoAliases.Length; i++)
+		{
+			AddCommand(EchoAliases[i], "echo");
+		}
+	}
+
+	private void AddCommand(string keyword, string command)
+	{
+		commands[keyword] = () => HandleCommand(command);
 	}
 
 	private void HandleCommand(string command)
