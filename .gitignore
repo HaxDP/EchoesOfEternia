@@ -1,3 +1,4 @@
+.utmp/
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
@@ -5,12 +6,26 @@
 /[Bb]uilds/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
-/MemoryCaptures/
-/Recordings/
+*.log
 
-/.vs/
-/.vscode/
-/.idea/
+*.blend1
+*.blend1.meta
+
+/[Mm]emoryCaptures/
+
+/[Rr]ecordings/
+
+# /[Aa]ssets/AssetStoreTools*
+
+/[Aa]ssets/Plugins/Editor/JetBrains*
+*.DotSettings.user
+
+.vs/
+
+.gradle/
+
+ExportedObj/
+.consulo/
 *.csproj
 *.unityproj
 *.sln
@@ -30,11 +45,29 @@
 *.pdb.meta
 *.mdb.meta
 
-/sysinfo.txt
+sysinfo.txt
+
+mono_crash.*
 
 *.apk
 *.aab
 *.unitypackage
+*.unitypackage.meta
 *.app
 
-/crashlytics-build.properties
+crashlytics-build.properties
+
+InitTestScene*.unity*
+
+/ServerData
+/[Aa]ssets/StreamingAssets/aa*
+/[Aa]ssets/AddressableAssetsData/link.xml*
+/[Aa]ssets/Addressables_Temp*
+/[Aa]ssets/AddressableAssetsData/*/*.bin*
+
+/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Flow/UnitOptions.db
+/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Flow/UnitOptions.db.meta
+/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property Providers
+/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property Providers.meta
+
+/[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
