@@ -18,8 +18,14 @@ public class VoiceRecognition : MonoBehaviour
 	[SerializeField] private bool useFuzzyMatching = true;
 	[SerializeField, Range(0.5f, 1f)] private float fuzzySimilarityThreshold = 0.6f;
 
+	[Header("Fallback Recognition")]
+	[SerializeField] private bool useDictationFallback = true;
+	[SerializeField] private ConfidenceLevel dictationMinConfidence = ConfidenceLevel.Low;
+	[SerializeField, Min(0.1f)] private float duplicateCommandCooldownSeconds = 0.35f;
+
 	[Header("Tise Quiet Check")]
 	[SerializeField] private bool requireQuietVoiceForTise = true;
+	[SerializeField] private bool strictTiseQuietCheck;
 	[SerializeField, Range(-80f, -5f)] private float tiseMaxDecibels = -32f;
 	[SerializeField] private int loudnessSampleWindow = 1024;
 	[SerializeField] private int microphoneFrequency = 16000;
@@ -29,27 +35,45 @@ public class VoiceRecognition : MonoBehaviour
 	[SerializeField, Range(1f, 20f)] private float calibrationHeadroomDecibels = 8f;
 	[SerializeField, Min(0.25f)] private float microphoneWarmupTimeoutSeconds = 2f;
 
+	[Header("Microphone Selection")]
+	[SerializeField] private bool useSystemDefaultMicrophone = true;
+	[SerializeField] private string preferredMicrophoneDevice = string.Empty;
+	[SerializeField, Min(0.25f)] private float microphoneDeviceRefreshIntervalSeconds = 1f;
+	[SerializeField] private bool restartSpeechRecognizersOnDeviceChange = true;
+
 	[Header("Events")]
 	[SerializeField] private VoiceCommandEvent onCommandRecognized;
 
 	public event Action<string> CommandRecognized;
 
+	public float CurrentDecibels => currentDecibels;
+	public bool IsMicrophoneMonitoringEnabled => requireQuietVoiceForTise;
+	public bool IsMicrophoneCaptureActive => microphoneClip != null && Microphone.IsRecording(microphoneDevice);
+	public string ActiveMicrophoneDeviceName => string.IsNullOrEmpty(microphoneDevice) ? "<system default>" : microphoneDevice;
+	public bool IsKeywordRecognizerRunning => keywordRecognizer != null && keywordRecognizer.IsRunning;
+	public SpeechSystemStatus DictationRecognizerStatus => dictationRecognizer == null ? SpeechSystemStatus.Stopped : dictationRecognizer.Status;
+
 	private readonly Dictionary<string, Action> commands = new Dictionary<string, Action>(StringComparer.OrdinalIgnoreCase);
 	private static readonly string[] TiseAliases =
 	{
-		"tise", "tais", "tyce", "ties", "taise", "taiz", "taisz", "tease", "teez", "tays", "тайс", "тайз"
+		"tise", "tais", "tyce", "ties", "taise", "taiz", "taisz", "tease", "teez", "tays", "tice", "tize", "tis", "tiss", "thais", "тайс", "тайз"
 	};
 
 	private static readonly string[] EchoAliases =
 	{
-		"echo", "akho", "aho", "eko", "ecco", "ekko", "eho", "ekho", "yeho", "yekho", "jeho", "ехо", "эхо"
+		"echo", "echoo", "ecko", "eco", "akho", "aho", "eko", "ecco", "ekko", "eho", "ekho", "yeho", "yekho", "jeho", "ехо", "эхо"
 	};
 
 	private KeywordRecognizer keywordRecognizer;
+	private DictationRecognizer dictationRecognizer;
 	private AudioClip microphoneClip;
 	private string microphoneDevice;
 	private float currentDecibels = -80f;
 	private Coroutine calibrationCoroutine;
+	private string lastCanonicalCommand = string.Empty;
+	private float lastCommandTime = -10f;
+	private string microphoneDevicesSignature = string.Empty;
+	private float nextMicrophoneDeviceRefreshTime;
 
 	private void Awake()
 	{
@@ -64,12 +88,14 @@ public class VoiceRecognition : MonoBehaviour
 	private void OnDestroy()
 	{
 		StopRecognition();
+		StopDictationFallback();
 		StopMicrophoneCapture();
 	}
 
 	private void Update()
 	{
 		UpdateCurrentDecibels();
+		RefreshMicrophoneCaptureIfDeviceListChanged();
 	}
 
 	public void StartRecognition()
@@ -91,7 +117,9 @@ public class VoiceRecognition : MonoBehaviour
 		keywordRecognizer = new KeywordRecognizer(keywords.ToArray(), recognizerConfidence);
 		keywordRecognizer.OnPhraseRecognized += OnPhraseRecognized;
 		keywordRecognizer.Start();
+		StartDictationFallback();
 		StartMicrophoneCapture();
+		Debug.Log("VoiceRecognition: KeywordRecognizer and DictationRecognizer use the OS default microphone input device.");
 
 		if (calibrateTiseThresholdOnStart)
 		{
@@ -117,6 +145,8 @@ public class VoiceRecognition : MonoBehaviour
 
 		keywordRecognizer.Dispose();
 		keywordRecognizer = null;
+
+		StopDictationFallback();
 
 		if (calibrationCoroutine != null)
 		{
@@ -157,15 +187,7 @@ public class VoiceRecognition : MonoBehaviour
 	{
 		var recognizedText = NormalizeKeyword(args.text);
 		var mappedKeyword = recognizedText;
-		if (!commands.TryGetValue(mappedKeyword, out var action) && useFuzzyMatching)
-		{
-			if (TryFindClosestKeyword(recognizedText, out var closestKeyword, out var similarity))
-			{
-				mappedKeyword = closestKeyword;
-				action = commands[closestKeyword];
-				Debug.Log($"VoiceRecognition: Fuzzy match '{recognizedText}' -> '{closestKeyword}' ({similarity:P0})");
-			}
-		}
+		TryResolveCommand(recognizedText, out mappedKeyword, out var action);
 
 		if (action == null)
 		{
@@ -173,17 +195,188 @@ public class VoiceRecognition : MonoBehaviour
 			return;
 		}
 
-		if (requireQuietVoiceForTise && IsTiseAlias(mappedKeyword) && !IsQuietEnoughForTise())
+		ExecuteResolvedCommand(mappedKeyword, action, args.text, "keyword");
+	}
+
+	private void OnDictationResult(string text, ConfidenceLevel confidence)
+	{
+		if (confidence < dictationMinConfidence)
 		{
-			Debug.Log($"VoiceRecognition: Ignored tise because voice was too loud. dB: {currentDecibels:F1}, max: {tiseMaxDecibels:F1}, phrase: {args.text}");
+			return;
+		}
+
+		var recognizedText = NormalizeKeyword(text);
+		if (string.IsNullOrEmpty(recognizedText))
+		{
+			return;
+		}
+
+		TryResolveCommand(recognizedText, out var mappedKeyword, out var action);
+		if (action == null)
+		{
+			return;
+		}
+
+		ExecuteResolvedCommand(mappedKeyword, action, text, "dictation");
+	}
+
+	private void ExecuteResolvedCommand(string mappedKeyword, Action action, string rawText, string source)
+	{
+		if (requireQuietVoiceForTise && strictTiseQuietCheck && IsTiseAlias(mappedKeyword) && !IsQuietEnoughForTise())
+		{
+			Debug.Log($"VoiceRecognition: Ignored tise because voice was too loud. dB: {currentDecibels:F1}, max: {tiseMaxDecibels:F1}, phrase: {rawText}");
+			return;
+		}
+
+		var canonicalCommand = GetCanonicalCommand(mappedKeyword);
+		var now = Time.unscaledTime;
+		if (string.Equals(canonicalCommand, lastCanonicalCommand, StringComparison.OrdinalIgnoreCase) && now - lastCommandTime < duplicateCommandCooldownSeconds)
+		{
 			return;
 		}
 
 		action.Invoke();
-		var canonicalCommand = GetCanonicalCommand(mappedKeyword);
 		onCommandRecognized?.Invoke(canonicalCommand);
 		CommandRecognized?.Invoke(canonicalCommand);
-		Debug.Log($"Recognized command: {canonicalCommand} (raw: {args.text})");
+
+		lastCanonicalCommand = canonicalCommand;
+		lastCommandTime = now;
+		Debug.Log($"Recognized command: {canonicalCommand} (source: {source}, raw: {rawText})");
+	}
+
+	private void StartDictationFallback()
+	{
+		if (!useDictationFallback)
+		{
+			return;
+		}
+
+		if (dictationRecognizer == null)
+		{
+			dictationRecognizer = new DictationRecognizer();
+			dictationRecognizer.DictationResult += OnDictationResult;
+			dictationRecognizer.DictationError += OnDictationError;
+		}
+
+		if (dictationRecognizer.Status == SpeechSystemStatus.Stopped)
+		{
+			try
+			{
+				dictationRecognizer.Start();
+			}
+			catch (Exception exception)
+			{
+				Debug.LogWarning($"VoiceRecognition: Dictation fallback failed to start: {exception.Message}");
+			}
+		}
+	}
+
+	private void StopDictationFallback()
+	{
+		if (dictationRecognizer == null)
+		{
+			return;
+		}
+
+		dictationRecognizer.DictationResult -= OnDictationResult;
+		dictationRecognizer.DictationError -= OnDictationError;
+
+		if (dictationRecognizer.Status == SpeechSystemStatus.Running)
+		{
+			dictationRecognizer.Stop();
+		}
+
+		dictationRecognizer.Dispose();
+		dictationRecognizer = null;
+	}
+
+	private void OnDictationError(string error, int hresult)
+	{
+		Debug.LogWarning($"VoiceRecognition: Dictation fallback error: {error} ({hresult})");
+	}
+
+	private void TryResolveCommand(string recognizedText, out string mappedKeyword, out Action action)
+	{
+		mappedKeyword = recognizedText;
+		action = null;
+
+		if (commands.TryGetValue(recognizedText, out action))
+		{
+			return;
+		}
+
+		if (TryResolveFromFuzzy(recognizedText, out mappedKeyword, out action))
+		{
+			return;
+		}
+
+		if (TryResolveFromTokens(recognizedText, out mappedKeyword, out action))
+		{
+			return;
+		}
+
+		if (LooksLikeEcho(recognizedText) && commands.TryGetValue("echo", out action))
+		{
+			mappedKeyword = "echo";
+			Debug.Log($"VoiceRecognition: Echo fallback for phrase '{recognizedText}'");
+		}
+	}
+
+	private bool TryResolveFromFuzzy(string recognizedText, out string mappedKeyword, out Action action)
+	{
+		mappedKeyword = recognizedText;
+		action = null;
+
+		if (!useFuzzyMatching)
+		{
+			return false;
+		}
+
+		if (TryFindClosestKeyword(recognizedText, out var closestKeyword, out var similarity))
+		{
+			mappedKeyword = closestKeyword;
+			action = commands[closestKeyword];
+			Debug.Log($"VoiceRecognition: Fuzzy match '{recognizedText}' -> '{closestKeyword}' ({similarity:P0})");
+			return true;
+		}
+
+		return false;
+	}
+
+	private bool TryResolveFromTokens(string recognizedText, out string mappedKeyword, out Action action)
+	{
+		mappedKeyword = recognizedText;
+		action = null;
+
+		var tokens = recognizedText.Split(new[] { ' ', '\t', ',', '.', ';', ':', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
+		for (var i = 0; i < tokens.Length; i++)
+		{
+			var token = tokens[i];
+			if (commands.TryGetValue(token, out action))
+			{
+				mappedKeyword = token;
+				Debug.Log($"VoiceRecognition: Token match '{recognizedText}' -> '{token}'");
+				return true;
+			}
+
+			if (TryResolveFromFuzzy(token, out mappedKeyword, out action))
+			{
+				Debug.Log($"VoiceRecognition: Token fuzzy match '{recognizedText}' -> '{mappedKeyword}'");
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private bool LooksLikeEcho(string text)
+	{
+		if (string.IsNullOrEmpty(text))
+		{
+			return false;
+		}
+
+		return text.Contains("echo") || text.Contains("eco") || text.Contains("ecko") || text.Contains("eko") || text.Contains("eho") || text.Contains("akho") || text.Contains("aho") || text.Contains("ехо") || text.Contains("эхо");
 	}
 
 	private string NormalizeKeyword(string input)
@@ -405,15 +598,25 @@ public class VoiceRecognition : MonoBehaviour
 			return;
 		}
 
-		microphoneDevice = Microphone.devices[0];
+		microphoneDevice = ResolveMicrophoneDeviceForCapture();
 		microphoneClip = Microphone.Start(microphoneDevice, true, 1, microphoneFrequency);
+		microphoneDevicesSignature = BuildMicrophoneDeviceSignature();
+
+		if (microphoneClip == null)
+		{
+			var selectedDevice = string.IsNullOrEmpty(microphoneDevice) ? "<system default>" : microphoneDevice;
+			Debug.LogWarning($"VoiceRecognition: Failed to start microphone capture with device '{selectedDevice}'.");
+			return;
+		}
+
+		var activeDevice = string.IsNullOrEmpty(microphoneDevice) ? "<system default>" : microphoneDevice;
+		Debug.Log($"VoiceRecognition: Microphone capture started with device '{activeDevice}'.");
 	}
 
 	private void StopMicrophoneCapture()
 	{
-		if (string.IsNullOrEmpty(microphoneDevice))
+		if (microphoneClip == null)
 		{
-			microphoneClip = null;
 			return;
 		}
 
@@ -425,6 +628,8 @@ public class VoiceRecognition : MonoBehaviour
 		microphoneClip = null;
 		microphoneDevice = null;
 		currentDecibels = -80f;
+		microphoneDevicesSignature = string.Empty;
+		nextMicrophoneDeviceRefreshTime = 0f;
 	}
 
 	private void UpdateCurrentDecibels()
@@ -441,7 +646,7 @@ public class VoiceRecognition : MonoBehaviour
 			return false;
 		}
 
-		if (microphoneClip == null || string.IsNullOrEmpty(microphoneDevice) || !Microphone.IsRecording(microphoneDevice))
+		if (microphoneClip == null || !Microphone.IsRecording(microphoneDevice))
 		{
 			return false;
 		}
@@ -484,6 +689,112 @@ public class VoiceRecognition : MonoBehaviour
 	private bool IsMicrophoneAvailable()
 	{
 		return Microphone.devices != null && Microphone.devices.Length > 0;
+	}
+
+	public void ApplyMicrophoneSelectionNow()
+	{
+		if (!requireQuietVoiceForTise)
+		{
+			return;
+		}
+
+		if (restartSpeechRecognizersOnDeviceChange && keywordRecognizer != null && keywordRecognizer.IsRunning)
+		{
+			Debug.Log("VoiceRecognition: Applying microphone selection by restarting speech recognizers.");
+			RestartRecognition();
+			return;
+		}
+
+		StopMicrophoneCapture();
+		StartMicrophoneCapture();
+	}
+
+	public string[] GetAvailableMicrophoneDevices()
+	{
+		if (Microphone.devices == null || Microphone.devices.Length == 0)
+		{
+			return Array.Empty<string>();
+		}
+
+		var devicesCopy = new string[Microphone.devices.Length];
+		Array.Copy(Microphone.devices, devicesCopy, Microphone.devices.Length);
+		return devicesCopy;
+	}
+
+	private string ResolveMicrophoneDeviceForCapture()
+	{
+		if (useSystemDefaultMicrophone)
+		{
+			return null;
+		}
+
+		if (!string.IsNullOrWhiteSpace(preferredMicrophoneDevice))
+		{
+			for (var i = 0; i < Microphone.devices.Length; i++)
+			{
+				var device = Microphone.devices[i];
+				if (string.Equals(device, preferredMicrophoneDevice, StringComparison.OrdinalIgnoreCase))
+				{
+					return device;
+				}
+			}
+
+			for (var i = 0; i < Microphone.devices.Length; i++)
+			{
+				var device = Microphone.devices[i];
+				if (device.IndexOf(preferredMicrophoneDevice, StringComparison.OrdinalIgnoreCase) >= 0)
+				{
+					return device;
+				}
+			}
+
+			Debug.LogWarning($"VoiceRecognition: Preferred microphone '{preferredMicrophoneDevice}' not found. Falling back to first device.");
+		}
+
+		return Microphone.devices[0];
+	}
+
+	private string BuildMicrophoneDeviceSignature()
+	{
+		if (!IsMicrophoneAvailable())
+		{
+			return string.Empty;
+		}
+
+		return string.Join("|", Microphone.devices);
+	}
+
+	private void RefreshMicrophoneCaptureIfDeviceListChanged()
+	{
+		if (!requireQuietVoiceForTise || microphoneClip == null)
+		{
+			return;
+		}
+
+		if (Time.unscaledTime < nextMicrophoneDeviceRefreshTime)
+		{
+			return;
+		}
+
+		nextMicrophoneDeviceRefreshTime = Time.unscaledTime + microphoneDeviceRefreshIntervalSeconds;
+		var currentSignature = BuildMicrophoneDeviceSignature();
+		if (string.Equals(currentSignature, microphoneDevicesSignature, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		microphoneDevicesSignature = currentSignature;
+		Debug.Log("VoiceRecognition: Microphone device list changed. Restarting capture.");
+
+		if (restartSpeechRecognizersOnDeviceChange && keywordRecognizer != null && keywordRecognizer.IsRunning)
+		{
+			Debug.Log("VoiceRecognition: Restarting speech recognizers to apply current OS default microphone.");
+			RestartRecognition();
+			return;
+		}
+
+		StopMicrophoneCapture();
+		StartMicrophoneCapture();
 	}
 
 	private void BuildCommandMaps()

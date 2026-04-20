@@ -569,6 +569,7 @@ GameObject:
   - component: {fileID: 1578509680}
   - component: {fileID: 1578509684}
   - component: {fileID: 1578509683}
+  - component: {fileID: 1578509685}
   m_Layer: 0
   m_Name: Character
   m_TagString: Untagged
@@ -592,7 +593,11 @@ MonoBehaviour:
   startOnAwake: 1
   useFuzzyMatching: 1
   fuzzySimilarityThreshold: 0.6
+  useDictationFallback: 1
+  dictationMinConfidence: 2
+  duplicateCommandCooldownSeconds: 0.35
   requireQuietVoiceForTise: 1
+  strictTiseQuietCheck: 0
   tiseMaxDecibels: -32
   loudnessSampleWindow: 1024
   microphoneFrequency: 16000
@@ -601,6 +606,10 @@ MonoBehaviour:
   calibrationDurationSeconds: 2
   calibrationHeadroomDecibels: 8
   microphoneWarmupTimeoutSeconds: 2
+  useSystemDefaultMicrophone: 1
+  preferredMicrophoneDevice: 
+  microphoneDeviceRefreshIntervalSeconds: 1
+  restartSpeechRecognizersOnDeviceChange: 1
   onCommandRecognized:
     m_PersistentCalls:
       m_Calls:
@@ -728,6 +737,29 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &1578509685
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1578509679}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e7f1c12df7186543a1c4af75b1351c3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  voiceRecognition: {fileID: 0}
+  togglePanelKey: 289
+  showPanel: 1
+  showDeviceList: 1
+  panelRect:
+    serializedVersion: 2
+    x: 16
+    y: 16
+    width: 380
+    height: 240
+  meterSmoothing: 0.15
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
