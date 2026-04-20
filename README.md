@@ -15,8 +15,5 @@ EchoesOfEternia - це Unity-проєкт із базовою сценою, ке
 - [VoiceInputDebugPanel](Assets/Scripts/Player/Voice/VoiceInputDebugPanel.cs)
 - [VoiceRecognitionEditor](Assets/Scripts/Player/Voice/Editor/VoiceRecognitionEditor.cs)
 
-## Як запустити
-Відкрий проєкт у Unity, потім відкрий сцену [SampleScene](Assets/Scenes/SampleScene.unity) і запусти Play Mode.
-
 ## Changelog
 Історія змін винесена в окремий файл: [CHANGELOG.md](CHANGELOG.md)
