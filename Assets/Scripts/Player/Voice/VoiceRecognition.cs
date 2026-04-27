@@ -23,14 +23,14 @@ public class VoiceRecognition : MonoBehaviour
 	[SerializeField] private ConfidenceLevel dictationMinConfidence = ConfidenceLevel.Low;
 	[SerializeField, Min(0.1f)] private float duplicateCommandCooldownSeconds = 0.35f;
 
-	[Header("Tise Quiet Check")]
-	[SerializeField] private bool requireQuietVoiceForTise = true;
-	[SerializeField] private bool strictTiseQuietCheck;
-	[SerializeField, Range(-80f, -5f)] private float tiseMaxDecibels = -32f;
+	[Header("Silenta Quiet Check")]
+	[SerializeField] private bool requireQuietVoiceForSilenta = true;
+	[SerializeField] private bool strictSilentaQuietCheck;
+	[SerializeField, Range(-80f, -5f)] private float silentaMaxDecibels = -32f;
 	[SerializeField] private int loudnessSampleWindow = 1024;
 	[SerializeField] private int microphoneFrequency = 16000;
-	[SerializeField] private bool logTiseVolumeChecks;
-	[SerializeField] private bool calibrateTiseThresholdOnStart = true;
+	[SerializeField] private bool logSilentaVolumeChecks;
+	[SerializeField] private bool calibrateSilentaThresholdOnStart = true;
 	[SerializeField, Min(0.5f)] private float calibrationDurationSeconds = 2f;
 	[SerializeField, Range(1f, 20f)] private float calibrationHeadroomDecibels = 8f;
 	[SerializeField, Min(0.25f)] private float microphoneWarmupTimeoutSeconds = 2f;
@@ -47,21 +47,21 @@ public class VoiceRecognition : MonoBehaviour
 	public event Action<string> CommandRecognized;
 
 	public float CurrentDecibels => currentDecibels;
-	public bool IsMicrophoneMonitoringEnabled => requireQuietVoiceForTise;
+	public bool IsMicrophoneMonitoringEnabled => requireQuietVoiceForSilenta;
 	public bool IsMicrophoneCaptureActive => microphoneClip != null && Microphone.IsRecording(microphoneDevice);
 	public string ActiveMicrophoneDeviceName => string.IsNullOrEmpty(microphoneDevice) ? "<system default>" : microphoneDevice;
 	public bool IsKeywordRecognizerRunning => keywordRecognizer != null && keywordRecognizer.IsRunning;
 	public SpeechSystemStatus DictationRecognizerStatus => dictationRecognizer == null ? SpeechSystemStatus.Stopped : dictationRecognizer.Status;
 
 	private readonly Dictionary<string, Action> commands = new Dictionary<string, Action>(StringComparer.OrdinalIgnoreCase);
-	private static readonly string[] TiseAliases =
+	private static readonly string[] SilentaAliases =
 	{
-		"tise", "tais", "tyce", "ties", "taise", "taiz", "taisz", "tease", "teez", "tays", "tice", "tize", "tis", "tiss", "thais", "тайс", "тайз"
+		"silenta"
 	};
 
-	private static readonly string[] EchoAliases =
+	private static readonly string[] ReveraAliases =
 	{
-		"echo", "echoo", "ecko", "eco", "akho", "aho", "eko", "ecco", "ekko", "eho", "ekho", "yeho", "yekho", "jeho", "ехо", "эхо"
+		"revera"
 	};
 
 	private KeywordRecognizer keywordRecognizer;
@@ -121,9 +121,9 @@ public class VoiceRecognition : MonoBehaviour
 		StartMicrophoneCapture();
 		Debug.Log("VoiceRecognition: KeywordRecognizer and DictationRecognizer use the OS default microphone input device.");
 
-		if (calibrateTiseThresholdOnStart)
+		if (calibrateSilentaThresholdOnStart)
 		{
-			StartTiseQuietCalibration();
+			StartSilentaQuietCalibration();
 		}
 
 		Debug.Log($"VoiceRecognition started. Commands: {keywords.Count}, recognizerConfidence: {recognizerConfidence}");
@@ -157,9 +157,9 @@ public class VoiceRecognition : MonoBehaviour
 		StopMicrophoneCapture();
 	}
 
-	public void StartTiseQuietCalibration()
+	public void StartSilentaQuietCalibration()
 	{
-		if (!requireQuietVoiceForTise)
+		if (!requireQuietVoiceForSilenta)
 		{
 			return;
 		}
@@ -169,7 +169,7 @@ public class VoiceRecognition : MonoBehaviour
 			StopCoroutine(calibrationCoroutine);
 		}
 
-		calibrationCoroutine = StartCoroutine(CalibrateTiseQuietThresholdRoutine());
+		calibrationCoroutine = StartCoroutine(CalibrateSilentaQuietThresholdRoutine());
 	}
 
 	private void RestartRecognition()
@@ -222,9 +222,9 @@ public class VoiceRecognition : MonoBehaviour
 
 	private void ExecuteResolvedCommand(string mappedKeyword, Action action, string rawText, string source)
 	{
-		if (requireQuietVoiceForTise && strictTiseQuietCheck && IsTiseAlias(mappedKeyword) && !IsQuietEnoughForTise())
+		if (requireQuietVoiceForSilenta && strictSilentaQuietCheck && IsSilentaAlias(mappedKeyword) && !IsQuietEnoughForSilenta())
 		{
-			Debug.Log($"VoiceRecognition: Ignored tise because voice was too loud. dB: {currentDecibels:F1}, max: {tiseMaxDecibels:F1}, phrase: {rawText}");
+			Debug.Log($"VoiceRecognition: Ignored silenta because voice was too loud. dB: {currentDecibels:F1}, max: {silentaMaxDecibels:F1}, phrase: {rawText}");
 			return;
 		}
 
@@ -315,10 +315,10 @@ public class VoiceRecognition : MonoBehaviour
 			return;
 		}
 
-		if (LooksLikeEcho(recognizedText) && commands.TryGetValue("echo", out action))
+		if (LooksLikeRevera(recognizedText) && commands.TryGetValue("revera", out action))
 		{
-			mappedKeyword = "echo";
-			Debug.Log($"VoiceRecognition: Echo fallback for phrase '{recognizedText}'");
+			mappedKeyword = "revera";
+			Debug.Log($"VoiceRecognition: Revera fallback for phrase '{recognizedText}'");
 		}
 	}
 
@@ -369,14 +369,14 @@ public class VoiceRecognition : MonoBehaviour
 		return false;
 	}
 
-	private bool LooksLikeEcho(string text)
+	private bool LooksLikeRevera(string text)
 	{
 		if (string.IsNullOrEmpty(text))
 		{
 			return false;
 		}
 
-		return text.Contains("echo") || text.Contains("eco") || text.Contains("ecko") || text.Contains("eko") || text.Contains("eho") || text.Contains("akho") || text.Contains("aho") || text.Contains("ехо") || text.Contains("эхо");
+		return text.Contains("revera");
 	}
 
 	private string NormalizeKeyword(string input)
@@ -384,11 +384,11 @@ public class VoiceRecognition : MonoBehaviour
 		return input == null ? string.Empty : input.Trim().ToLowerInvariant();
 	}
 
-	private bool IsTiseAlias(string command)
+	private bool IsSilentaAlias(string command)
 	{
-		for (var i = 0; i < TiseAliases.Length; i++)
+		for (var i = 0; i < SilentaAliases.Length; i++)
 		{
-			if (string.Equals(command, TiseAliases[i], StringComparison.OrdinalIgnoreCase))
+			if (string.Equals(command, SilentaAliases[i], StringComparison.OrdinalIgnoreCase))
 			{
 				return true;
 			}
@@ -397,11 +397,11 @@ public class VoiceRecognition : MonoBehaviour
 		return false;
 	}
 
-	private bool IsEchoAlias(string command)
+	private bool IsReveraAlias(string command)
 	{
-		for (var i = 0; i < EchoAliases.Length; i++)
+		for (var i = 0; i < ReveraAliases.Length; i++)
 		{
-			if (string.Equals(command, EchoAliases[i], StringComparison.OrdinalIgnoreCase))
+			if (string.Equals(command, ReveraAliases[i], StringComparison.OrdinalIgnoreCase))
 			{
 				return true;
 			}
@@ -417,14 +417,14 @@ public class VoiceRecognition : MonoBehaviour
 			return string.Empty;
 		}
 
-		if (IsTiseAlias(command))
+		if (IsSilentaAlias(command))
 		{
-			return "tise";
+			return "silenta";
 		}
 
-		if (IsEchoAlias(command))
+		if (IsReveraAlias(command))
 		{
-			return "echo";
+			return "revera";
 		}
 
 		return command;
@@ -500,24 +500,24 @@ public class VoiceRecognition : MonoBehaviour
 		return matrix[sourceLength, targetLength];
 	}
 
-	private bool IsQuietEnoughForTise()
+	private bool IsQuietEnoughForSilenta()
 	{
 		if (!IsMicrophoneAvailable())
 		{
 			return false;
 		}
 
-		var isQuiet = currentDecibels <= tiseMaxDecibels;
+		var isQuiet = currentDecibels <= silentaMaxDecibels;
 
-		if (logTiseVolumeChecks)
+		if (logSilentaVolumeChecks)
 		{
-			Debug.Log($"VoiceRecognition: Tise quiet check dB={currentDecibels:F1}, threshold={tiseMaxDecibels:F1}, pass={isQuiet}");
+			Debug.Log($"VoiceRecognition: Silenta quiet check dB={currentDecibels:F1}, threshold={silentaMaxDecibels:F1}, pass={isQuiet}");
 		}
 
 		return isQuiet;
 	}
 
-	private IEnumerator CalibrateTiseQuietThresholdRoutine()
+	private IEnumerator CalibrateSilentaQuietThresholdRoutine()
 	{
 		StartMicrophoneCapture();
 
@@ -552,7 +552,7 @@ public class VoiceRecognition : MonoBehaviour
 		var totalDecibels = 0f;
 		var sampleCount = 0;
 
-		Debug.Log("VoiceRecognition: Calibrating tise quiet threshold. Please stay silent.");
+		Debug.Log("VoiceRecognition: Calibrating silenta quiet threshold. Please stay silent.");
 
 		while (elapsed < calibrationDurationSeconds)
 		{
@@ -569,8 +569,8 @@ public class VoiceRecognition : MonoBehaviour
 		if (sampleCount > 0)
 		{
 			var ambientDecibels = totalDecibels / sampleCount;
-			tiseMaxDecibels = Mathf.Clamp(ambientDecibels + calibrationHeadroomDecibels, -80f, -5f);
-			Debug.Log($"VoiceRecognition: Calibration complete. Ambient dB: {ambientDecibels:F1}, new tise threshold: {tiseMaxDecibels:F1}");
+			silentaMaxDecibels = Mathf.Clamp(ambientDecibels + calibrationHeadroomDecibels, -80f, -5f);
+			Debug.Log($"VoiceRecognition: Calibration complete. Ambient dB: {ambientDecibels:F1}, new silenta threshold: {silentaMaxDecibels:F1}");
 		}
 		else
 		{
@@ -582,7 +582,7 @@ public class VoiceRecognition : MonoBehaviour
 
 	private void StartMicrophoneCapture()
 	{
-		if (!requireQuietVoiceForTise)
+		if (!requireQuietVoiceForSilenta)
 		{
 			return;
 		}
@@ -594,7 +594,7 @@ public class VoiceRecognition : MonoBehaviour
 
 		if (!IsMicrophoneAvailable())
 		{
-			Debug.LogWarning("VoiceRecognition: No microphone device found. Quiet check for tise will be blocked.");
+			Debug.LogWarning("VoiceRecognition: No microphone device found. Quiet check for silenta will be blocked.");
 			return;
 		}
 
@@ -641,7 +641,7 @@ public class VoiceRecognition : MonoBehaviour
 	{
 		decibels = -80f;
 
-		if (!requireQuietVoiceForTise)
+		if (!requireQuietVoiceForSilenta)
 		{
 			return false;
 		}
@@ -693,7 +693,7 @@ public class VoiceRecognition : MonoBehaviour
 
 	public void ApplyMicrophoneSelectionNow()
 	{
-		if (!requireQuietVoiceForTise)
+		if (!requireQuietVoiceForSilenta)
 		{
 			return;
 		}
@@ -766,7 +766,7 @@ public class VoiceRecognition : MonoBehaviour
 
 	private void RefreshMicrophoneCaptureIfDeviceListChanged()
 	{
-		if (!requireQuietVoiceForTise || microphoneClip == null)
+		if (!requireQuietVoiceForSilenta || microphoneClip == null)
 		{
 			return;
 		}
@@ -806,15 +806,17 @@ public class VoiceRecognition : MonoBehaviour
 		AddCommand("default", "default");
 		AddCommand("ignis", "ignis");
 		AddCommand("mentiri", "mentiri");
+		//AddCommand("silenta", "silenta");
+		//AddCommand("revera", "revera");
 
-		for (var i = 0; i < TiseAliases.Length; i++)
+		for (var i = 0; i < SilentaAliases.Length; i++)
 		{
-			AddCommand(TiseAliases[i], "tise");
+			AddCommand(SilentaAliases[i], "silenta");
 		}
 
-		for (var i = 0; i < EchoAliases.Length; i++)
+		for (var i = 0; i < ReveraAliases.Length; i++)
 		{
-			AddCommand(EchoAliases[i], "echo");
+			AddCommand(ReveraAliases[i], "revera");
 		}
 	}
 

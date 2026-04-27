@@ -4,14 +4,14 @@ using UnityEngine;
 [RequireComponent(typeof(SpriteRenderer))]
 public class PhraseColorVisualizer : MonoBehaviour
 {
-	private static readonly string[] TiseAliases =
+	private static readonly string[] SilentaAliases =
 	{
-		"tise", "tais", "tyce", "ties", "taise", "taiz", "taisz", "tease", "teez", "tays", "тайс", "тайз"
+		"silenta"
 	};
 
-	private static readonly string[] EchoAliases =
+	private static readonly string[] ReveraAliases =
 	{
-		"echo", "eko", "ecco", "ekko", "eho", "ekho", "yeho", "yekho", "jeho", "akho", "aho", "ехо", "эхо"
+		"revera"
 	};
 
 	[Header("Target")]
@@ -21,8 +21,8 @@ public class PhraseColorVisualizer : MonoBehaviour
 	[Header("Phrase Colors")]
 	[SerializeField] private Color ignisColor = new Color(1f, 0.5f, 0f, 1f);
 	[SerializeField] private Color mentiriColor = new Color(1f, 0f, 0f, 1f);
-	[SerializeField] private Color echoColor = new Color(0.5f, 0.9f, 1f, 1f);
-	[SerializeField] private Color tiseColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+	[SerializeField] private Color reveraColor = new Color(0.5f, 0.9f, 1f, 1f);
+	[SerializeField] private Color silentaColor = new Color(0.85f, 0.85f, 0.85f, 1f);
 	[SerializeField] private Color defaultColor = Color.white;
 
 	private void Awake()
@@ -83,11 +83,11 @@ public class PhraseColorVisualizer : MonoBehaviour
 			case "mentiri":
 				SetColor(mentiriColor);
 				break;
-			case "echo":
-				SetColor(echoColor);
+			case "revera":
+				SetColor(reveraColor);
 				break;
-			case "tise":
-				SetColor(tiseColor);
+			case "silenta":
+				SetColor(silentaColor);
 				break;
 			case "default":
 				SetColor(defaultColor);
@@ -115,14 +115,14 @@ public class PhraseColorVisualizer : MonoBehaviour
 
 	private string ToCanonicalCommand(string phrase)
 	{
-		if (IsAlias(phrase, TiseAliases))
+		if (IsAlias(phrase, SilentaAliases))
 		{
-			return "tise";
+			return "silenta";
 		}
 
-		if (IsAlias(phrase, EchoAliases))
+		if (IsAlias(phrase, ReveraAliases))
 		{
-			return "echo";
+			return "revera";
 		}
 
 		switch (phrase)

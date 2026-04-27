@@ -5,7 +5,7 @@ EchoesOfEternia - це Unity-проєкт із базовою сценою, ке
 ## Що є в проєкті
 У сцені додано три основні об'єкти: персонаж, ground і spell visualizer. Персонаж рухається по сцені, ground працює як опора, а spell visualizer показує результат голосової команди через зміну кольору.
 
-Голосова частина обробляє команди ignis, mentiri, echo, tise. Для стабільнішої роботи додано alias, fuzzy matching і fallback логіку, а також інструменти діагностики мікрофона.
+Голосова частина обробляє команди ignis, mentiri, revera, silenta. Для стабільнішої роботи додано alias, fuzzy matching і fallback логіку, а також інструменти діагностики мікрофона.
 
 ## Основні скрипти
 - [PlayerMovement](Assets/Scripts/Player/Movement/PlayerMovement.cs)
