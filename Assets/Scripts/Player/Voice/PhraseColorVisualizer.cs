@@ -9,9 +9,9 @@ public class PhraseColorVisualizer : MonoBehaviour
 		"silenta"
 	};
 
-	private static readonly string[] ReveraAliases =
+	private static readonly string[] RezonaAliases =
 	{
-		"revera"
+		"rezona"
 	};
 
 	[Header("Target")]
@@ -21,7 +21,7 @@ public class PhraseColorVisualizer : MonoBehaviour
 	[Header("Phrase Colors")]
 	[SerializeField] private Color ignisColor = new Color(1f, 0.5f, 0f, 1f);
 	[SerializeField] private Color mentiriColor = new Color(1f, 0f, 0f, 1f);
-	[SerializeField] private Color reveraColor = new Color(0.5f, 0.9f, 1f, 1f);
+	[SerializeField] private Color rezonaColor = new Color(0.5f, 0.9f, 1f, 1f);
 	[SerializeField] private Color silentaColor = new Color(0.85f, 0.85f, 0.85f, 1f);
 	[SerializeField] private Color defaultColor = Color.white;
 
@@ -83,8 +83,8 @@ public class PhraseColorVisualizer : MonoBehaviour
 			case "mentiri":
 				SetColor(mentiriColor);
 				break;
-			case "revera":
-				SetColor(reveraColor);
+			case "rezona":
+				SetColor(rezonaColor);
 				break;
 			case "silenta":
 				SetColor(silentaColor);
@@ -120,9 +120,9 @@ public class PhraseColorVisualizer : MonoBehaviour
 			return "silenta";
 		}
 
-		if (IsAlias(phrase, ReveraAliases))
+		if (IsAlias(phrase, RezonaAliases))
 		{
-			return "revera";
+			return "rezona";
 		}
 
 		switch (phrase)

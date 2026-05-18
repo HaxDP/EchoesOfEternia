@@ -59,9 +59,9 @@ public class VoiceRecognition : MonoBehaviour
 		"silenta"
 	};
 
-	private static readonly string[] ReveraAliases =
+	private static readonly string[] RezonaAliases =
 	{
-		"revera"
+		"rezona"
 	};
 
 	private KeywordRecognizer keywordRecognizer;
@@ -315,10 +315,10 @@ public class VoiceRecognition : MonoBehaviour
 			return;
 		}
 
-		if (LooksLikeRevera(recognizedText) && commands.TryGetValue("revera", out action))
+		if (LooksLikeRezona(recognizedText) && commands.TryGetValue("rezona", out action))
 		{
-			mappedKeyword = "revera";
-			Debug.Log($"VoiceRecognition: Revera fallback for phrase '{recognizedText}'");
+			mappedKeyword = "rezona";
+			Debug.Log($"VoiceRecognition: Rezona fallback for phrase '{recognizedText}'");
 		}
 	}
 
@@ -369,14 +369,14 @@ public class VoiceRecognition : MonoBehaviour
 		return false;
 	}
 
-	private bool LooksLikeRevera(string text)
+	private bool LooksLikeRezona(string text)
 	{
 		if (string.IsNullOrEmpty(text))
 		{
 			return false;
 		}
 
-		return text.Contains("revera");
+		return text.Contains("rezona");
 	}
 
 	private string NormalizeKeyword(string input)
@@ -397,11 +397,11 @@ public class VoiceRecognition : MonoBehaviour
 		return false;
 	}
 
-	private bool IsReveraAlias(string command)
+	private bool IsRezonaAlias(string command)
 	{
-		for (var i = 0; i < ReveraAliases.Length; i++)
+		for (var i = 0; i < RezonaAliases.Length; i++)
 		{
-			if (string.Equals(command, ReveraAliases[i], StringComparison.OrdinalIgnoreCase))
+			if (string.Equals(command, RezonaAliases[i], StringComparison.OrdinalIgnoreCase))
 			{
 				return true;
 			}
@@ -422,9 +422,9 @@ public class VoiceRecognition : MonoBehaviour
 			return "silenta";
 		}
 
-		if (IsReveraAlias(command))
+		if (IsRezonaAlias(command))
 		{
-			return "revera";
+			return "rezona";
 		}
 
 		return command;
@@ -807,16 +807,16 @@ public class VoiceRecognition : MonoBehaviour
 		AddCommand("ignis", "ignis");
 		AddCommand("mentiri", "mentiri");
 		//AddCommand("silenta", "silenta");
-		//AddCommand("revera", "revera");
+		//AddCommand("rezona", "rezona");
 
 		for (var i = 0; i < SilentaAliases.Length; i++)
 		{
 			AddCommand(SilentaAliases[i], "silenta");
 		}
 
-		for (var i = 0; i < ReveraAliases.Length; i++)
+		for (var i = 0; i < RezonaAliases.Length; i++)
 		{
-			AddCommand(ReveraAliases[i], "revera");
+			AddCommand(RezonaAliases[i], "rezona");
 		}
 	}
 

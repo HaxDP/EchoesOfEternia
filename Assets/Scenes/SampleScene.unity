@@ -570,6 +570,7 @@ GameObject:
   - component: {fileID: 1578509684}
   - component: {fileID: 1578509683}
   - component: {fileID: 1578509685}
+  - component: {fileID: 1578509686}
   m_Layer: 0
   m_Name: Character
   m_TagString: Untagged
@@ -760,6 +761,39 @@ MonoBehaviour:
     width: 380
     height: 240
   meterSmoothing: 0.15
+--- !u!114 &1578509686
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1578509679}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d222e0d0e9f9a3245b3a24280874b0ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  voiceRecognition: {fileID: 1578509680}
+  volumeLayers:
+  - {fileID: 2800000, guid: 9564f3b70aeb9a44592c53bb6dd9d57f, type: 3}
+  - {fileID: 2800000, guid: 1a0d4b57200ad0c448be678112a1b30b, type: 3}
+  - {fileID: 2800000, guid: e0f459ba52906fe42b37ec52881d84d4, type: 3}
+  - {fileID: 2800000, guid: 4a5ae65f70f288e4e8ed51b55f707a66, type: 3}
+  - {fileID: 2800000, guid: ccbdb66c283ca2d4199092885f3c0ac0, type: 3}
+  - {fileID: 2800000, guid: 42e1d5535f123cc409e59d9b4ca593e4, type: 3}
+  - {fileID: 2800000, guid: 646ce997145062f43b8f8c3e2c6f0662, type: 3}
+  quietDecibels: -70
+  loudDecibels: -10
+  smoothing: 0.15
+  showOverlay: 1
+  screenRect:
+    serializedVersion: 2
+    x: 16
+    y: 16
+    width: 96
+    height: 96
+  scaleMode: 2
+  alphaBlend: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
